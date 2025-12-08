@@ -5,6 +5,7 @@ import Welcome from './components/auth/Welcome';
 import Login from './components/auth/Login';
 import JoinBubble from './components/auth/JoinBubble';
 import CreateBubbleFlow from './components/auth/CreateBubbleFlow';
+import { Purchases } from '@revenuecat/purchases-js';
 
 export default function FamilyBubbleApp() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -12,13 +13,39 @@ export default function FamilyBubbleApp() {
   const [view, setView] = useState('welcome'); // welcome, login, join, create, main
   const [joinToken, setJoinToken] = useState(null);
   const [bubbleCreationData, setBubbleCreationData] = useState(null);
+  const [isPremium, setIsPremium] = useState(false); // New state for premium status
 
+  // Initialize RevenueCat SDK once when the component mounts
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(user => {
+    const revenueCatApiKey = process.env.REACT_APP_REVENUECAT_PUBLIC_API_KEY; // Replace with your actual RevenueCat public API key from .env.local or your build process. Find it in RevenueCat Dashboard -> API Keys.
+
+    const unsubscribe = auth.onAuthStateChanged(async user => { // Made async to await Purchases.getCustomerInfo()
       setCurrentUser(user);
       setLoading(false);
+
+      if (revenueCatApiKey && user && !Purchases.isConfigured) {
+        Purchases.configure({ apiKey: revenueCatApiKey, appUserID: user.uid });
+        console.log("RevenueCat SDK configured.");
+      }
+
       if (user) {
+        // Fetch RevenueCat customer info to determine premium status
+        try {
+          const customerInfo = await Purchases.getCustomerInfo();
+          if (customerInfo.entitlements.active.premium) { // Assuming 'premium' is your entitlement ID
+            setIsPremium(true);
+            console.log("User is premium.");
+          } else {
+            setIsPremium(false);
+            console.log("User is not premium.");
+          }
+        } catch (e) {
+          console.error("Error fetching RevenueCat customer info:", e);
+          setIsPremium(false); // Assume not premium on error
+        }
         setView('main');
+      } else {
+        setIsPremium(false); // Reset premium status on logout
       }
     });
     return () => unsubscribe();
@@ -74,6 +101,7 @@ export default function FamilyBubbleApp() {
       return <CreateBubbleFlow 
                 onComplete={(data) => { setBubbleCreationData(data); setView('login'); }}
                 onBack={() => setView('welcome')}
+                isPremium={isPremium} // Pass isPremium prop
               />;
     }
     if (view === 'login') {
@@ -88,6 +116,7 @@ export default function FamilyBubbleApp() {
         onLogout={handleLogout} 
         joinToken={joinToken} 
         bubbleCreationData={bubbleCreationData}
+        onBubbleCreated={() => setBubbleCreationData(null)}
       />
     </div>
   );

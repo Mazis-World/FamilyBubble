@@ -7,12 +7,13 @@ import { getFunctions } from "firebase/functions";
 // Your web app's Firebase configuration
 // IMPORTANT: Replace with your actual Firebase project configuration
 const firebaseConfig = {
-  apiKey: "REPLACE_WITH_YOUR_API_KEY",
+  apiKey: "AIzaSyDOQK3z7XNdJ2P2JW10hbSBv0GLiO2oJkE",
   authDomain: "familybubble-ecfa6.firebaseapp.com",
   projectId: "familybubble-ecfa6",
-  storageBucket: "familybubble-ecfa6.appspot.com",
-  messagingSenderId: "REPLACE_WITH_YOUR_MESSAGING_SENDER_ID",
-  appId: "REPLACE_WITH_YOUR_APP_ID"
+  storageBucket: "familybubble-ecfa6.firebasestorage.app",
+  messagingSenderId: "804761460768",
+  appId: "1:804761460768:web:1010dccfd9d48b1e695c45",
+  measurementId: "G-ZP7G17MS89"
 };
 
 // Initialize Firebase

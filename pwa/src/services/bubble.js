@@ -28,13 +28,14 @@ let mockDB = {
 
 export const API = {
   // Create a new bubble (only when first user signs up)
-  createBubble: async (userId, userName, bubbleName) => {
+  createBubble: async (userId, firstName, lastName, bubbleName, userPhoto, relationshipRole) => {
     const bubbleId = `bubble${Date.now()}`;
     const memberId = `member${Date.now()}`;
+    const fullName = `${firstName} ${lastName}`;
     
     mockDB.bubbles.push({
       bubbleId,
-      name: bubbleName || `${userName}'s Bubble`,
+      name: bubbleName || `${fullName}'s Bubble`,
       createdBy: userId,
       createdAt: Date.now()
     });
@@ -43,7 +44,11 @@ export const API = {
       memberId,
       userId,
       bubbleId,
-      name: userName,
+      name: fullName,
+      firstName,
+      lastName,
+      userPhoto,
+      relationshipRole,
       status: 'Safe',
       role: 'owner',
       joinedAt: Date.now()

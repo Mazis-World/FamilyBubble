@@ -6,7 +6,7 @@ import StatusButton from '../ui/StatusButton';
 import MemberBubble from '../ui/MemberBubble';
 import { Circle, Plus, Share2, Settings } from 'lucide-react';
 
-const MainApp = ({ userId, onLogout, joinToken: initialJoinToken, bubbleCreationData }) => {
+const MainApp = ({ userId, onLogout, joinToken: initialJoinToken, bubbleCreationData, onBubbleCreated }) => {
   const [bubbleData, setBubbleData] = useState(null);
   const [showStatus, setShowStatus] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -17,26 +17,31 @@ const MainApp = ({ userId, onLogout, joinToken: initialJoinToken, bubbleCreation
   const [joinName, setJoinName] = useState('');
 
   useEffect(() => {
-    if (bubbleCreationData) {
-      setJoinName(bubbleCreationData.userName);
+    // If bubbleCreationData exists, it means the user just completed the create bubble flow
+    if (bubbleCreationData && userId) {
+      const { bubbleName, firstName, lastName, userPhoto, relationshipRole } = bubbleCreationData;
+      API.createBubble(userId, firstName, lastName, bubbleName, userPhoto, relationshipRole)
+        .then(() => {
+          onBubbleCreated(); // Clear the creation data from App.js
+          loadBubble(); // Load the newly created bubble
+        })
+        .catch(error => {
+          console.error("Error creating bubble:", error);
+          alert("Failed to create bubble. Please try again.");
+          onBubbleCreated(); // Clear the creation data even on error
+        });
+    } else {
+      loadBubble(); // Normal bubble loading if not creating a new one
     }
-    loadBubble();
-  }, [userId, bubbleCreationData]);
+  }, [userId, bubbleCreationData, onBubbleCreated, API]);
   
   const loadBubble = async () => {
     const data = await API.getUserBubble(userId);
     if (data) {
       setBubbleData(data);
-    } else {
+    } else if (!bubbleCreationData) { // Only show join screen if no bubble and not in creation flow
       setShowJoin(true);
     }
-  };
-
-  const handleCreateBubble = async () => {
-    const bubbleName = bubbleCreationData ? bubbleCreationData.bubbleName : `${joinName}'s Bubble`;
-    await API.createBubble(userId, joinName || 'Me', bubbleName);
-    setShowJoin(false);
-    loadBubble();
   };
 
   const handleJoinBubble = async () => {
@@ -79,20 +84,9 @@ const MainApp = ({ userId, onLogout, joinToken: initialJoinToken, bubbleCreation
             <p className="text-gray-400">Create a new bubble or join an existing one</p>
           </div>
 
-          <div className="space-y-4 mb-6">
-            <input
-              type="text"
-              placeholder="Your Name"
-              value={joinName}
-              onChange={(e) => setJoinName(e.target.value)}
-              className="w-full px-4 py-4 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-600 transition-colors"
-            />
-          </div>
-
           <div className="space-y-3 mb-6">
             <button
-              onClick={handleCreateBubble}
-              disabled={!joinName}
+              disabled={true} 
               className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Create New Bubble
