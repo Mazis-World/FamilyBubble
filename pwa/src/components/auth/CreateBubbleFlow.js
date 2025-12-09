@@ -1,67 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ChevronRight, Circle, ShieldCheck, Star, Plus, ChevronDown } from 'lucide-react';
 import CustomSelect from '../ui/CustomSelect';
-import { Purchases } from '@revenuecat/purchases-js';
 import { auth } from '../../firebase';
 
-const CreateBubbleFlow = ({ onComplete, onBack, isPremium }) => {
+const CreateBubbleFlow = ({ onComplete, onBack, isPremium, handlePurchase }) => {
   const [step, setStep] = useState(1);
   const [bubbleName, setBubbleName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [userPhoto, setUserPhoto] = useState(null); // URL or base64
   const [relationshipRole, setRelationshipRole] = useState('');
 
-  const [offerings, setOfferings] = useState(null);
-  const [loadingOfferings, setLoadingOfferings] = useState(true);
-  const [offeringsError, setOfferingsError] = useState(null);
-
-
-
-  // Fetch offerings when the paywall step is reached and RevenueCat is configured
-  useEffect(() => {
-    if (step === 6 && Purchases.isConfigured) {
-      const fetchOfferings = async () => {
-        setLoadingOfferings(true);
-        setOfferingsError(null);
-        try {
-          const offerings = await Purchases.getOfferings();
-          setOfferings(offerings.current); // Assuming we want the current offering set
-          console.log("RevenueCat Offerings fetched:", offerings);
-        } catch (e) {
-          console.error("Error fetching RevenueCat offerings:", e);
-          setOfferingsError("Failed to load subscription options. Please try again.");
-        } finally {
-          setLoadingOfferings(false);
-        }
-      };
-      fetchOfferings();
-    }
-  }, [step]);
-
-
   const nextStep = () => setStep(s => s + 1);
   const prevStep = () => setStep(s => s - 1);
-
-  const handlePurchase = async (packageToPurchase) => {
-    try {
-      // purchasePackage returns the customerInfo and a boolean indicating if it was a real purchase
-      const { customerInfo, product, presentedOfferingIdentifier } = await Purchases.purchasePackage(packageToPurchase);
-      if (customerInfo.entitlements.active.premium) { // Assuming 'premium' is the entitlement ID
-        console.log("Purchase successful! User is now premium.");
-        onComplete(); // Only call onComplete after a successful purchase
-      } else {
-        console.log("Purchase made, but premium entitlement not active.");
-      }
-    } catch (e) {
-      if (!e.userCancelled) {
-        console.error("Error purchasing package:", e);
-        // TODO: Show error message to user
-      } else {
-        console.log("Purchase cancelled by user.");
-      }
-    }
-  };
 
   const relationshipOptions = [
     { value: '', label: 'Select your role', disabled: true }, // Placeholder option
@@ -123,11 +76,47 @@ const CreateBubbleFlow = ({ onComplete, onBack, isPremium }) => {
       case 3:
         return (
           <Step
+            title="Your Email"
+            subtitle="This will be used to secure your account."
+            onNext={nextStep}
+            onBack={prevStep}
+            canGoNext={/\S+@\S+\.\S+/.test(email)}
+          >
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full text-center font-bold text-2xl px-4 py-5 bg-gray-900/50 border-2 border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+            />
+          </Step>
+        );
+      case 4:
+        return (
+          <Step
+            title="Create a Password"
+            subtitle="Must be at least 6 characters long."
+            onNext={nextStep}
+            onBack={prevStep}
+            canGoNext={password.length >= 6}
+          >
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full text-center font-bold text-2xl px-4 py-5 bg-gray-900/50 border-2 border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+            />
+          </Step>
+        );
+      case 5:
+        return (
+          <Step
             title="Add Your Photo"
             subtitle="This will be visible to members in your bubble."
             onNext={nextStep}
             onBack={prevStep}
-            canGoNext={userPhoto !== null}
+            canGoNext={true} // Allow skipping photo
           >
             <input
               type="file"
@@ -180,7 +169,7 @@ const CreateBubbleFlow = ({ onComplete, onBack, isPremium }) => {
             </label>
           </Step>
         );
-      case 4:
+      case 6:
         return (
           <Step
             title="Your Role in the Bubble"
@@ -206,12 +195,16 @@ const CreateBubbleFlow = ({ onComplete, onBack, isPremium }) => {
             )}
           </Step>
         );
-      case 5:
+      case 7:
         return (
           <Step
             title="Ready to Create Your Bubble!"
             subtitle="Here's a summary of your new bubble."
-            onNext={isPremium ? onComplete : nextStep} // If premium, complete; otherwise, go to next step (paywall)
+            onNext={() => {
+              // Paywall temporarily bypassed for deployment/testing
+              // handlePurchase(() => onComplete({ bubbleName, firstName, lastName, userPhoto, relationshipRole }))
+              onComplete({ bubbleName, firstName, lastName, email, password, userPhoto, relationshipRole });
+            }}
             onBack={prevStep}
             canGoNext={true}
           >
@@ -235,16 +228,7 @@ const CreateBubbleFlow = ({ onComplete, onBack, isPremium }) => {
             </div>
           </Step>
         );
-      case 6:
-        return (
-          <PaywallStep
-            onPurchasePackage={handlePurchase}
-            onBack={prevStep}
-            offerings={offerings}
-            loadingOfferings={loadingOfferings}
-            offeringsError={offeringsError}
-          />
-        );
+
       default:
         return null;
     }
@@ -257,7 +241,7 @@ const CreateBubbleFlow = ({ onComplete, onBack, isPremium }) => {
   );
 };
 
-const Step = ({ title, subtitle, onNext, onBack, canGoNext, children }) => (
+const Step = ({ title, subtitle, onNext, onBack, canGoNext, children, nextButtonText = 'Next' }) => (
   <div className="max-w-md w-full z-10">
     <button
       onClick={onBack}
@@ -278,138 +262,12 @@ const Step = ({ title, subtitle, onNext, onBack, canGoNext, children }) => (
           disabled={!canGoNext}
           className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-purple-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
         >
-          Next
+          {nextButtonText}
           <ChevronRight size={20} />
         </button>
       </div>
     </div>
   </div>
 );
-
-const PaywallStep = ({ onPurchasePackage, onBack, offerings, loadingOfferings, offeringsError }) => {
-  const [selectedPackage, setSelectedPackage] = useState(null);
-  const [loadingPurchase, setLoadingPurchase] = useState(false);
-  const [purchaseError, setPurchaseError] = useState(null);
-
-  useEffect(() => {
-    if (offerings && offerings.availablePackages.length > 0) {
-      // Automatically select the first package if available
-      setSelectedPackage(offerings.availablePackages[0]);
-    }
-  }, [offerings]);
-
-  const handleSubscribeClick = async () => {
-    if (selectedPackage) {
-      setLoadingPurchase(true);
-      setPurchaseError(null);
-      try {
-        await onPurchasePackage(selectedPackage);
-      } catch (e) {
-        setPurchaseError("Purchase failed. Please try again.");
-      } finally {
-        setLoadingPurchase(false);
-      }
-    }
-  };
-
-  if (loadingOfferings) {
-    return (
-      <div className="max-w-md w-full z-10">
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-lg text-center">
-          <h1 className="text-4xl font-bold mb-2">Loading Plans...</h1>
-          <p className="text-gray-400">Please wait while we fetch subscription options.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (offeringsError) {
-    return (
-      <div className="max-w-md w-full z-10">
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-lg text-center">
-          <h1 className="text-4xl font-bold mb-2">Error</h1>
-          <p className="text-red-400">{offeringsError}</p>
-          <button
-            onClick={onBack}
-            className="mt-4 px-6 py-3 bg-red-600 rounded-xl font-semibold hover:bg-red-700 transition-colors"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Assuming `offerings.current` exists and contains `availablePackages`
-  const packages = offerings && offerings.availablePackages ? offerings.availablePackages : [];
-
-  return (
-    <div className="max-w-md w-full z-10">
-      <button
-        onClick={onBack}
-        className="flex items-center text-gray-400 hover:text-white transition-colors mb-8 group"
-      >
-        <ArrowLeft size={20} className="mr-2 group-hover:-translate-x-1 transition-transform" />
-        Back
-      </button>
-      <div className="bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-lg">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/30">
-            <Star size={32} className="text-white" />
-          </div>
-          <h1 className="text-4xl font-bold mb-2">Unlock Premium</h1>
-          <p className="text-gray-400">Choose a plan to create your bubble and get started.</p>
-        </div>
-
-        <div className="space-y-4">
-          {packages.length > 0 ? (
-            packages.map((pkg) => (
-              <div
-                key={pkg.identifier}
-                className={`bg-purple-600/20 border-2 rounded-xl p-5 text-left flex items-center cursor-pointer transition-all ${
-                  selectedPackage?.identifier === pkg.identifier
-                    ? 'border-purple-500 shadow-lg shadow-purple-500/30'
-                    : 'border-gray-700 hover:border-purple-500'
-                }`}
-                onClick={() => setSelectedPackage(pkg)}
-              >
-                <div>
-                  <h3 className="font-bold text-xl">{pkg.product.title}</h3>
-                  <p className="text-3xl font-bold">{pkg.product.priceString}
-                    <span className="text-base font-normal text-gray-400">
-                      {pkg.product.period?.numberOfUnits && pkg.product.period?.unit ? `/${pkg.product.period.numberOfUnits} ${pkg.product.period.unit}` : ''}
-                    </span>
-                  </p>
-                  <ul className="text-sm text-purple-200 mt-2 space-y-1">
-                    {/* Placeholder for features, ideally from product description */}
-                    <li className="flex items-center"><ShieldCheck size={14} className="mr-2 text-emerald-400" /> Up to 10 members</li>
-                    <li className="flex items-center"><ShieldCheck size={14} className="mr-2 text-emerald-400" /> Unlimited Status Updates</li>
-                    <li className="flex items-center"><ShieldCheck size={14} className="mr-2 text-emerald-400" /> Priority Support</li>
-                  </ul>
-                </div>
-                <div className="ml-auto">
-                  <Circle size={24} className={selectedPackage?.identifier === pkg.identifier ? 'text-purple-400' : 'text-gray-600'} />
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center text-gray-400">No subscription offerings available.</div>
-          )}
-
-          {purchaseError && <p className="text-red-400 text-center mt-2">{purchaseError}</p>}
-
-          <button
-            onClick={handleSubscribeClick}
-            disabled={!selectedPackage || loadingPurchase}
-            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white py-4 rounded-xl font-semibold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-amber-500/30 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loadingPurchase ? "Processing..." : "Subscribe & Create Bubble"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 
 export default CreateBubbleFlow;

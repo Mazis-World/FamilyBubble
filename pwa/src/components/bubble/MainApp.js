@@ -6,7 +6,7 @@ import StatusButton from '../ui/StatusButton';
 import MemberBubble from '../ui/MemberBubble';
 import { Circle, Plus, Share2, Settings } from 'lucide-react';
 
-const MainApp = ({ userId, onLogout, joinToken: initialJoinToken, bubbleCreationData, onBubbleCreated }) => {
+const MainApp = ({ userId, onLogout, joinToken: initialJoinToken, bubbleCreationData, onBubbleCreated, isSubscribed, onUpgrade, onInitiateCreate }) => {
   const [bubbleData, setBubbleData] = useState(null);
   const [showStatus, setShowStatus] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
@@ -33,19 +33,32 @@ const MainApp = ({ userId, onLogout, joinToken: initialJoinToken, bubbleCreation
     } else {
       loadBubble(); // Normal bubble loading if not creating a new one
     }
-  }, [userId, bubbleCreationData, onBubbleCreated, API]);
+  }, [userId, bubbleCreationData, onBubbleCreated, isSubscribed, onUpgrade, API]);
   
   const loadBubble = async () => {
     const data = await API.getUserBubble(userId);
     if (data) {
       setBubbleData(data);
+      setShowJoin(false); // Make sure to hide the join screen if a bubble is found
     } else if (!bubbleCreationData) { // Only show join screen if no bubble and not in creation flow
       setShowJoin(true);
     }
   };
 
+  const handleCreateBubbleClick = () => {
+    if (!isSubscribed) {
+      onUpgrade();
+    } else {
+      onInitiateCreate();
+    }
+  };
+
   const handleJoinBubble = async () => {
     try {
+      if (!joinName.trim() || !joinToken.trim()) {
+        alert("Please enter your name and an invite code.");
+        return;
+      }
       await API.joinBubble(joinToken, userId, joinName);
       setShowJoin(false);
       loadBubble();
@@ -86,8 +99,8 @@ const MainApp = ({ userId, onLogout, joinToken: initialJoinToken, bubbleCreation
 
           <div className="space-y-3 mb-6">
             <button
-              disabled={true} 
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-600/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleCreateBubbleClick}
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-4 rounded-xl font-semibold hover:shadow-lg hover:shadow-purple-600/30 transition-all"
             >
               Create New Bubble
             </button>
@@ -101,6 +114,13 @@ const MainApp = ({ userId, onLogout, joinToken: initialJoinToken, bubbleCreation
               </div>
             </div>
 
+             <input
+              type="text"
+              placeholder="Your Name"
+              value={joinName}
+              onChange={(e) => setJoinName(e.target.value)}
+              className="w-full px-4 py-4 bg-gray-900 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-600 transition-colors"
+            />
             <input
               type="text"
               placeholder="Enter Invite Code"
